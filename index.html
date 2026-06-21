@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Melodi → Gitar Tab</title>
+<style>
+  :root{
+    --bg:#1b1d1f;
+    --panel:#24272a;
+    --wood:#caa472;
+    --wood-dark:#a9824f;
+    --string:#e8e3d8;
+    --accent:#e3b04b;
+    --text:#e8e3d8;
+    --text-dim:#8a8d90;
+    --good:#5fae72;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Courier New', monospace;
+    padding:24px 16px 60px;
+  }
+  h1{
+    font-size:20px;
+    font-weight:600;
+    letter-spacing:0.5px;
+    margin:0 0 4px;
+  }
+  .subtitle{
+    color:var(--text-dim);
+    font-size:13px;
+    margin:0 0 20px;
+  }
+  textarea{
+    width:100%;
+    height:120px;
+    background:var(--panel);
+    color:var(--text);
+    border:1px solid #3a3d40;
+    border-radius:6px;
+    padding:10px;
+    font-family:monospace;
+    font-size:12px;
+    resize:vertical;
+  }
+  button{
+    margin-top:10px;
+    background:var(--accent);
+    color:#1b1d1f;
+    border:none;
+    border-radius:6px;
+    padding:10px 18px;
+    font-weight:700;
+    font-size:14px;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  button:hover{ opacity:0.9; }
+  .error{
+    color:#e36b5a;
+    font-size:13px;
+    margin-top:8px;
+    display:none;
+  }
+  .meta{
+    margin:20px 0 8px;
+    font-size:13px;
+    color:var(--text-dim);
+  }
+  .meta b{ color:var(--text); }
+
+  .tabs{
+    display:flex;
+    gap:8px;
+    margin:18px 0 14px;
+    flex-wrap:wrap;
+  }
+  .tab-btn{
+    background:var(--panel);
+    color:var(--text-dim);
+    border:1px solid #3a3d40;
+    border-radius:20px;
+    padding:7px 16px;
+    font-size:13px;
+    cursor:pointer;
+    font-family:inherit;
+    font-weight:400;
+  }
+  .tab-btn.active{
+    background:var(--accent);
+    color:#1b1d1f;
+    border-color:var(--accent);
+    font-weight:700;
+  }
+
+  .fretboard-wrap{
+    background:var(--panel);
+    border-radius:10px;
+    padding:18px 12px;
+    overflow-x:auto;
+  }
+  svg{ display:block; min-width:600px; }
+  .fret-line{ stroke:#555; stroke-width:1; }
+  .nut{ stroke:var(--string); stroke-width:4; }
+  .string-line{ stroke:#9c9c94; }
+  .inlay{ fill:#3a3d40; }
+  .fret-num{
+    fill:var(--text-dim);
+    font-size:11px;
+    font-family:monospace;
+    text-anchor:middle;
+  }
+  .string-label{
+    fill:var(--text-dim);
+    font-size:11px;
+    font-family:monospace;
+    text-anchor:end;
+  }
+  .note-dot{
+    stroke:#1b1d1f;
+    stroke-width:1.5;
+  }
+  .note-num{
+    fill:#1b1d1f;
+    font-size:10px;
+    font-weight:700;
+    text-anchor:middle;
+    font-family:monospace;
+    pointer-events:none;
+  }
+  .note-name-label{
+    fill:var(--text-dim);
+    font-size:9px;
+    text-anchor:middle;
+    font-family:monospace;
+  }
+
+  .legend{
+    margin-top:14px;
+    font-size:12px;
+    color:var(--text-dim);
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+  }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .dot-sample{
+    width:11px;height:11px;border-radius:50%;
+    background:var(--accent);
+    display:inline-block;
+  }
+
+  .sequence{
+    margin-top:20px;
+    background:var(--panel);
+    border-radius:10px;
+    padding:14px;
+    font-size:12px;
+    line-height:1.9;
+    color:var(--text-dim);
+    overflow-x:auto;
+    white-space:nowrap;
+  }
+  .seq-item{
+    display:inline-block;
+    margin-right:14px;
+  }
+  .seq-num{
+    color:var(--accent);
+    font-weight:700;
+  }
+  .seq-note{ color:var(--text); }
+
+  .hint{
+    font-size:12px;
+    color:var(--text-dim);
+    margin-top:6px;
+  }
+
+  #placeholder{
+    color:var(--text-dim);
+    font-size:13px;
+    padding:30px 0;
+    text-align:center;
+  }
+</style>
+</head>
+<body>
+
+<h1>Melodi → Gitar Tab</h1>
+<p class="subtitle">Hooktheory JSON yapıştır, melodiyi 3 farklı diyapazon pozisyonunda gör.</p>
+
+<textarea id="jsonInput" placeholder="Hooktheory clipboard JSON'unu buraya yapıştır..."></textarea>
+<br>
+<button id="parseBtn">Tab'a çevir</button>
+<div class="error" id="errorBox"></div>
+
+<div id="results" style="display:none;">
+  <div class="meta" id="metaInfo"></div>
+
+  <div class="tabs" id="tabSelector"></div>
+
+  <div class="fretboard-wrap">
+    <svg id="fretboardSvg"></svg>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot-sample"></span> Numara = melodideki sıra</span>
+    <span>Açık tel = 0. perde</span>
+  </div>
+
+  <div class="hint">Yatayda kaydırarak tüm perdeleri görebilirsin.</div>
+
+  <div class="sequence" id="sequenceList"></div>
+</div>
+
+<div id="placeholder">Henüz bir melodi yüklenmedi.</div>
+
+<script>
+// ---- Müzik teorisi temelleri ----
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const MAJOR_STEPS = [0,2,4,5,7,9,11];
+const MINOR_STEPS = [0,2,3,5,7,9,11]; // natural minor
+
+// Standart akort: 6. tel (kalın E) -> 1. tel (ince e)
+// MIDI-benzeri yarım ton değeri, E2=0 referans alınarak
+const TUNING = [
+  {string:6, name:"E", base:0},
+  {string:5, name:"A", base:5},
+  {string:4, name:"D", base:10},
+  {string:3, name:"G", base:15},
+  {string:2, name:"B", base:19},
+  {string:1, name:"e", base:24}
+];
+
+const NOTE_TO_SEMITONE = {};
+NOTE_NAMES.forEach((n,i)=>{ NOTE_TO_SEMITONE[n]=i; });
+// Enharmonic alternatives
+const ENHARMONIC = {"Db":"C#","Eb":"D#","Gb":"F#","Ab":"G#","Bb":"A#"};
+
+function noteNameToSemitone(name){
+  if(NOTE_TO_SEMITONE[name]!==undefined) return NOTE_TO_SEMITONE[name];
+  if(ENHARMONIC[name]!==undefined) return NOTE_TO_SEMITONE[ENHARMONIC[name]];
+  throw new Error("Tanınmayan nota adı: "+name);
+}
+
+function sdToSemitoneOffset(sd, scaleSteps){
+  // sd: "1".."7" diyatonik derece, scaleSteps: o tonun yarım ton kalıbı
+  const degree = parseInt(sd,10);
+  if(isNaN(degree) || degree<1 || degree>7){
+    throw new Error("Geçersiz sd değeri: "+sd);
+  }
+  return scaleSteps[degree-1];
+}
+
+function getAbsoluteSemitone(tonicSemitone, sd, octave, scaleSteps){
+  const offset = sdToSemitoneOffset(sd, scaleSteps);
+  return tonicSemitone + offset + (octave*12);
+}
+
+function semitoneToName(semitone){
+  const idx = ((semitone % 12) + 12) % 12;
+  return NOTE_NAMES[idx];
+}
+
+// ---- Fretboard pozisyon bulucu ----
+// Her tel+perde kombinasyonu için mutlak yarım ton değeri = TUNING.base + fret
+// Bir nota için, belirli bir perde aralığında (örn 0-4) hangi tel/perde eşleşir, bul.
+function findPositionsForSemitone(absSemitone, fretMin, fretMax){
+  const options = [];
+  TUNING.forEach(t=>{
+    const fret = absSemitone - t.base;
+    if(fret>=fretMin && fret<=fretMax){
+      options.push({string:t.string, fret:fret});
+    }
+  });
+  return options;
+}
+
+// Bir pozisyon penceresi (fretMin-fretMax) için, ardışık notalar arasındaki
+// tel değişimi + perde sıçramasını en aza indiren basit greedy seçim.
+function buildPositionSequence(notes, tonicSemitone, scaleSteps, fretMin, fretMax){
+  let prev = null;
+  const seq = [];
+  for(const n of notes){
+    const abs = getAbsoluteSemitone(tonicSemitone, n.sd, n.octave, scaleSteps);
+    const candidates = findPositionsForSemitone(abs, fretMin, fretMax);
+    if(candidates.length===0){
+      seq.push(null); // bu pencerede çalınamıyor
+      continue;
+    }
+    let best = candidates[0];
+    if(prev){
+      let bestScore = Infinity;
+      for(const c of candidates){
+        const stringJump = Math.abs(c.string - prev.string);
+        const fretJump = Math.abs(c.fret - prev.fret);
+        const score = fretJump*2 + stringJump; // perde sıçramasına biraz daha ağırlık
+        if(score < bestScore){
+          bestScore = score;
+          best = c;
+        }
+      }
+    }
+    seq.push(best);
+    prev = best;
+  }
+  return seq;
+}
+
+// ---- Hooktheory JSON parse ----
+function parseHooktheoryJSON(raw){
+  let data;
+  try{
+    data = JSON.parse(raw);
+  }catch(e){
+    throw new Error("JSON okunamadı. Yapıştırılan metni kontrol et.");
+  }
+
+  if(!data.notes || !Array.isArray(data.notes)){
+    throw new Error("'notes' alanı bulunamadı.");
+  }
+  if(!data.keys || !Array.isArray(data.keys) || data.keys.length===0){
+    throw new Error("'keys' (tonalite) alanı bulunamadı.");
+  }
+
+  const keyInfo = data.keys[0];
+  const tonic = keyInfo.tonic;
+  const scaleType = (keyInfo.scale || "major").toLowerCase();
+  const scaleSteps = scaleType.includes("minor") ? MINOR_STEPS : MAJOR_STEPS;
+  const tonicSemitone = noteNameToSemitone(tonic);
+
+  const notes = data.notes
+    .filter(n => !n.isRest)
+    .map(n => ({
+      beat: n.beat,
+      duration: n.duration,
+      sd: n.sd,
+      octave: n.octave || 0
+    }))
+    .sort((a,b)=>a.beat-b.beat);
+
+  if(notes.length===0){
+    throw new Error("Çalınabilir nota bulunamadı (hepsi rest).");
+  }
+
+  return { tonic, scaleType, tonicSemitone, scaleSteps, notes };
+}
+
+// ---- Render ----
+const FRET_WINDOWS = [
+  {label:"Açık pozisyon", min:0, max:4},
+  {label:"Orta pozisyon", min:4, max:9},
+  {label:"Yüksek pozisyon", min:7, max:12}
+];
+
+let currentParsed = null;
+let currentSequences = [];
+let activeTabIndex = 0;
+
+document.getElementById('parseBtn').addEventListener('click', ()=>{
+  const raw = document.getElementById('jsonInput').value.trim();
+  const errorBox = document.getElementById('errorBox');
+  errorBox.style.display = 'none';
+
+  if(!raw){
+    errorBox.textContent = "Önce bir JSON yapıştır.";
+    errorBox.style.display = 'block';
+    return;
+  }
+
+  try{
+    currentParsed = parseHooktheoryJSON(raw);
+  }catch(e){
+    errorBox.textContent = e.message;
+    errorBox.style.display = 'block';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('placeholder').style.display = 'block';
+    return;
+  }
+
+  // Her pozisyon penceresi için sekans hesapla
+  currentSequences = FRET_WINDOWS.map(w =>
+    buildPositionSequence(currentParsed.notes, currentParsed.tonicSemitone, currentParsed.scaleSteps, w.min, w.max)
+  );
+
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('results').style.display = 'block';
+
+  const enharmName = semitoneToName(currentParsed.tonicSemitone);
+  document.getElementById('metaInfo').innerHTML =
+    `Tonalite: <b>${currentParsed.tonic} ${currentParsed.scaleType}</b> &nbsp;·&nbsp; Nota sayısı: <b>${currentParsed.notes.length}</b>`;
+
+  renderTabSelector();
+  activeTabIndex = pickBestDefaultTab();
+  renderActiveTab();
+});
+
+function pickBestDefaultTab(){
+  // Hangi pencere en az "null" (çalınamayan nota) içeriyorsa onu öne çıkar
+  let bestIdx = 0;
+  let bestNullCount = Infinity;
+  currentSequences.forEach((seq, idx)=>{
+    const nullCount = seq.filter(s=>s===null).length;
+    if(nullCount < bestNullCount){
+      bestNullCount = nullCount;
+      bestIdx = idx;
+    }
+  });
+  return bestIdx;
+}
+
+function renderTabSelector(){
+  const container = document.getElementById('tabSelector');
+  container.innerHTML = '';
+  FRET_WINDOWS.forEach((w, idx)=>{
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn';
+    const nullCount = currentSequences[idx].filter(s=>s===null).length;
+    const warn = nullCount>0 ? ` ⚠` : '';
+    btn.textContent = `${w.label} (${w.min}-${w.max}.)${warn}`;
+    btn.addEventListener('click', ()=>{
+      activeTabIndex = idx;
+      renderActiveTab();
+    });
+    container.appendChild(btn);
+  });
+  highlightActiveTabBtn();
+}
+
+function highlightActiveTabBtn(){
+  const buttons = document.querySelectorAll('.tab-btn');
+  buttons.forEach((b,i)=>{
+    b.classList.toggle('active', i===activeTabIndex);
+  });
+}
+
+function renderActiveTab(){
+  highlightActiveTabBtn();
+  const window_ = FRET_WINDOWS[activeTabIndex];
+  const seq = currentSequences[activeTabIndex];
+  drawFretboard(window_.min, window_.max, seq);
+  renderSequenceList(seq);
+}
+
+function drawFretboard(fretMin, fretMax, seq){
+  const svg = document.getElementById('fretboardSvg');
+  svg.innerHTML = '';
+
+  const numFrets = fretMax - fretMin;
+  const fretWidth = 60;
+  const stringGap = 28;
+  const marginLeft = 50;
+  const marginTop = 20;
+  const marginBottom = 20;
+  const width = marginLeft + (numFrets+1)*fretWidth + 20;
+  const height = marginTop + 5*stringGap + marginBottom;
+
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('width', width);
+  svg.setAttribute('height', height);
+
+  // Fret lines
+  for(let f=0; f<=numFrets; f++){
+    const x = marginLeft + f*fretWidth;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', x); line.setAttribute('x2', x);
+    line.setAttribute('y1', marginTop); line.setAttribute('y2', marginTop+5*stringGap);
+    line.setAttribute('class', (fretMin===0 && f===0) ? 'nut' : 'fret-line');
+    svg.appendChild(line);
+
+    if(f<numFrets){
+      const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+      label.setAttribute('x', x+fretWidth/2);
+      label.setAttribute('y', marginTop+5*stringGap+16);
+      label.setAttribute('class','fret-num');
+      label.textContent = fretMin+f;
+      svg.appendChild(label);
+
+      // Inlay dots on 3,5,7,9,12
+      const actualFret = fretMin+f;
+      if([3,5,7,9].includes(actualFret) || actualFret%12===0){
+        const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        dot.setAttribute('cx', x+fretWidth/2);
+        dot.setAttribute('cy', marginTop+5*stringGap/2);
+        dot.setAttribute('r', actualFret%12===0 ? 4 : 3);
+        dot.setAttribute('class','inlay');
+        svg.appendChild(dot);
+      }
+    }
+  }
+
+  // String lines + labels
+  TUNING.forEach((t, i)=>{
+    const y = marginTop + i*stringGap;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', marginLeft); line.setAttribute('x2', width-20);
+    line.setAttribute('y1', y); line.setAttribute('y2', y);
+    line.setAttribute('class','string-line');
+    line.setAttribute('stroke-width', 1 + (5-i)*0.3);
+    svg.appendChild(line);
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+    label.setAttribute('x', marginLeft-10);
+    label.setAttribute('y', y+4);
+    label.setAttribute('class','string-label');
+    label.textContent = t.string + t.name;
+    svg.appendChild(label);
+  });
+
+  // Notes
+  const stringIndexMap = {6:0,5:1,4:2,3:3,2:4,1:5};
+  seq.forEach((pos, idx)=>{
+    if(!pos) return;
+    if(pos.fret < fretMin || pos.fret > fretMax) return;
+    const x = marginLeft + (pos.fret - fretMin)*fretWidth + (pos.fret===fretMin && fretMin===0 ? 8 : fretWidth/2);
+    const y = marginTop + stringIndexMap[pos.string]*stringGap;
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx', x);
+    circle.setAttribute('cy', y);
+    circle.setAttribute('r', 10);
+    circle.setAttribute('fill', '#e3b04b');
+    circle.setAttribute('class','note-dot');
+    svg.appendChild(circle);
+
+    const num = document.createElementNS('http://www.w3.org/2000/svg','text');
+    num.setAttribute('x', x);
+    num.setAttribute('y', y+3.5);
+    num.setAttribute('class','note-num');
+    num.textContent = idx+1;
+    svg.appendChild(num);
+  });
+}
+
+function renderSequenceList(seq){
+  const container = document.getElementById('sequenceList');
+  container.innerHTML = '';
+  const stringIndexMap = {6:0,5:1,4:2,3:3,2:4,1:5};
+
+  currentParsed.notes.forEach((n, idx)=>{
+    const pos = seq[idx];
+    const span = document.createElement('span');
+    span.className = 'seq-item';
+    if(pos){
+      span.innerHTML = `<span class="seq-num">${idx+1}.</span> <span class="seq-note">${pos.string}.tel/${pos.fret}.perde</span>`;
+    }else{
+      span.innerHTML = `<span class="seq-num">${idx+1}.</span> <span class="seq-note" style="color:#e36b5a">—</span>`;
+    }
+    container.appendChild(span);
+  });
+}
+</script>
+
+</body>
+</html>
